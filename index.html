@@ -1,0 +1,530 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Zero‑Form Policy Issuance – Prototype v2</title>
+<style>
+  :root{
+    --bg:#0f172a; /* slate-900 */
+    --card:#111827; /* gray-900 */
+    --muted:#94a3b8; /* slate-400 */
+    --acc:#22d3ee;  /* cyan-400 */
+    --acc2:#a78bfa; /* violet-400 */
+    --good:#22c55e;
+    --warn:#f59e0b;
+    --bad:#ef4444;
+    --text:#e5e7eb; /* gray-200 */
+    --shadow: 0 10px 25px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background: radial-gradient(1200px 600px at 10% -10%, rgba(167,139,250,.18), transparent 40%),
+                               radial-gradient(900px 500px at 100% 0%, rgba(34,211,238,.15), transparent 45%),
+                               var(--bg); color:var(--text); font-family: Inter, ui-sans-serif, system-ui, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+  }
+  header{
+    position:sticky; top:0; z-index:10; backdrop-filter: blur(6px);
+    background: linear-gradient(180deg, rgba(15,23,42,.85), rgba(15,23,42,.55));
+    border-bottom:1px solid rgba(148,163,184,.15);
+  }
+  .nav{display:flex; align-items:center; justify-content:space-between; max-width:1100px; margin:0 auto; padding:14px 20px}
+  .logo{display:flex; align-items:center; gap:10px; font-weight:700}
+  .logo svg{width:28px; height:28px}
+  .mode-toggle{border:1px solid rgba(148,163,184,.25); padding:8px 12px; border-radius:999px; cursor:pointer; background:rgba(2,6,23,.5)}
+
+  main{max-width:1100px; margin:28px auto; padding:0 20px}
+  .grid{display:grid; grid-template-columns: 300px 1fr; gap:18px}
+  @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+
+  /* Sidebar stepper */
+  .side{
+    position:sticky; top:84px; align-self:start; background:linear-gradient(180deg, rgba(17,24,39,.8), rgba(17,24,39,.6));
+    border:1px solid rgba(148,163,184,.2); border-radius:16px; box-shadow:var(--shadow);
+    padding:16px
+  }
+  .step{display:flex; align-items:center; gap:12px; padding:10px 8px; margin:6px 0; border-radius:12px; cursor:pointer}
+  .step.active{background:linear-gradient(90deg, rgba(167,139,250,.15), rgba(34,211,238,.1));}
+  .step .idx{width:28px; height:28px; display:grid; place-items:center; border-radius:8px; font-weight:700; background:rgba(148,163,184,.18)}
+  .step .title{font-weight:600}
+  .progress{height:8px; background:rgba(148,163,184,.2); border-radius:999px; overflow:hidden; margin:10px 0 2px}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg, var(--acc), var(--acc2)); transition:width .4s ease}
+  .tiny{ color:var(--muted); font-size:12px}
+
+  /* Cards */
+  .card{background:linear-gradient(180deg, rgba(17,24,39,.85), rgba(2,6,23,.8)); border:1px solid rgba(148,163,184,.2); border-radius:16px; box-shadow:var(--shadow); padding:18px; margin-bottom:16px}
+  h2{margin:0 0 8px 0; font-size:22px}
+  p{color:#cbd5e1}
+  .row{display:flex; gap:14px; flex-wrap:wrap}
+  .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.25); color:#e2e8f0; font-size:12px}
+
+  button{background: linear-gradient(90deg, var(--acc), var(--acc2)); color:#0b1020; border:none; padding:12px 16px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow: 0 6px 16px rgba(167,139,250,.25);}
+  button.secondary{background:transparent; color:#e5e7eb; border:1px solid rgba(148,163,184,.35); box-shadow:none}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  .actions{display:flex; gap:10px; justify-content:flex-end; margin-top:14px}
+
+  .screen{display:none}
+  .screen.active{display:block; animation:fade .35s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+  /* Specific UI components */
+  .scan-box{border:2px dashed rgba(148,163,184,.35); border-radius:16px; padding:14px; display:flex; align-items:center; justify-content:center; min-height:160px; background:rgba(2,6,23,.4)}
+  .keyvals{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-top:12px}
+  .kv{background:rgba(148,163,184,.08); padding:10px; border-radius:12px; border:1px solid rgba(148,163,184,.16)}
+  .kv .k{font-size:12px; color:var(--muted)}
+  .kv .v{font-weight:700}
+
+  .toggle{display:flex; align-items:center; gap:10px; margin:8px 0}
+  .toggle input{appearance:none; width:44px; height:24px; border-radius:999px; background:#334155; position:relative; outline:none; cursor:pointer}
+  .toggle input:checked{background: linear-gradient(90deg, var(--acc), var(--acc2))}
+  .toggle input::after{content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:white; transition:.2s}
+  .toggle input:checked::after{left:23px}
+
+  .tip{font-size:12px; color:#9ca3af; border-left:3px solid rgba(167,139,250,.6); padding-left:10px}
+
+  .ar-stage{position:relative; height:260px; background: radial-gradient(600px 220px at 70% 10%, rgba(34,211,238,.08), transparent 40%), rgba(2,6,23,.5); border:1px dashed rgba(148,163,184,.35); border-radius:16px; overflow:hidden}
+  .car-sil{position:absolute; inset:0; display:grid; place-items:center; opacity:.35}
+  .guide{position:absolute; inset:0; pointer-events:none}
+  .guide svg{width:100%; height:100%}
+  .angle-bad{color:var(--bad)}
+  .angle-ok{color:var(--good)}
+
+  .breakdown{display:grid; grid-template-columns:1.4fr .6fr; gap:14px}
+  @media (max-width: 700px){ .breakdown{grid-template-columns:1fr} }
+  .line{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed rgba(148,163,184,.2)}
+  .total{font-size:20px; font-weight:800}
+  .chart{height:160px; background:rgba(148,163,184,.08); border:1px solid rgba(148,163,184,.2); border-radius:12px; display:grid; place-items:center}
+
+  .esign-pad{border:1px dashed rgba(148,163,184,.35); height:160px; border-radius:12px; background:rgba(2,6,23,.5)}
+  .check{display:flex; gap:10px; align-items:flex-start; margin:8px 0}
+
+  .card-pol{display:grid; grid-template-columns: 1fr 120px; gap:12px; align-items:center; padding:16px; border-radius:16px; background:linear-gradient(135deg, rgba(167,139,250,.25), rgba(34,211,238,.2)); color:#0b1020}
+  .card-pol h3{margin:0}
+  .qr{width:100px; height:100px; background: conic-gradient(from 0deg, #0b1020, #111827); border-radius:8px}
+
+  /* Chat helper */
+  .helper{position:fixed; right:18px; bottom:18px}
+  .bubble{background:linear-gradient(135deg, rgba(167,139,250,.65), rgba(34,211,238,.65)); color:#0b1020; padding:10px 12px; border-radius:12px; box-shadow:var(--shadow)}
+  .fab{margin-top:10px; width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg, var(--acc), var(--acc2)); display:grid; place-items:center; color:#0b1020; font-weight:900; box-shadow:var(--shadow); cursor:pointer}
+
+  .footer{opacity:.7; font-size:12px; text-align:center; padding:16px}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="url(#g)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
+        <path d="M3 12h18M5 6h14M7 18h10"/>
+      </svg>
+      <span>Zero‑Form Issuance • Prototype v2</span>
+    </div>
+    <button class="mode-toggle" id="modeBtn">Toggle theme</button>
+  </div>
+</header>
+
+<main class="grid">
+  <!-- Sidebar stepper -->
+  <aside class="side">
+    <div class="progress"><div class="bar" id="bar"></div></div>
+    <div class="tiny" id="pct">0% complete</div>
+    <div id="steps"></div>
+  </aside>
+
+  <!-- Screens -->
+  <section id="screens">
+
+    <!-- 1 VEHICLE SCAN -->
+    <div class="card screen active" data-step="1" data-title="Vehicle Scan (Plate/VIN)">
+      <h2>1) Vehicle Scan</h2>
+      <p>Use your camera to scan the license plate or VIN. We’ll auto‑detect make/model/year and pre‑fill details. You can also upload a photo if you’re on a laptop.</p>
+      <div class="scan-box" id="scanBox">
+        <div>
+          <input type="file" id="plateUpload" accept="image/*" />
+          <div class="tip">Tip: Clear, front‑on photo with good lighting works best.</div>
+          <div style="margin-top:10px"><button id="simulateOCR">Simulate Scan</button></div>
+        </div>
+      </div>
+      <div class="keyvals" id="vehData" style="display:none">
+        <div class="kv"><div class="k">Detected Plate</div><div class="v" id="plateVal">MH01AB1234</div></div>
+        <div class="kv"><div class="k">VIN</div><div class="v" id="vinVal">MA3EJKD29L1234567</div></div>
+        <div class="kv"><div class="k">Make / Model</div><div class="v">Maruti Baleno</div></div>
+        <div class="kv"><div class="k">Year</div><div class="v">2022</div></div>
+      </div>
+      <div class="actions">
+        <button class="secondary" disabled id="prev1">Back</button>
+        <button id="next1" disabled>Next</button>
+      </div>
+    </div>
+
+    <!-- 2 NFC / QR ATTESTATION -->
+    <div class="card screen" data-step="2" data-title="NFC / QR Attestation">
+      <h2>2) NFC / QR Attestation</h2>
+      <p>Tap the vehicle NFC tag (or scan QR) to bind the physical car to this digital flow. We generate a short‑lived signed challenge to prevent spoofing.</p>
+      <div class="row">
+        <button id="tapNFC">Simulate NFC Tap</button>
+        <button class="secondary" id="scanQR">Simulate QR Scan</button>
+      </div>
+      <div class="keyvals" id="attestBlock" style="display:none">
+        <div class="kv"><div class="k">Challenge</div><div class="v" id="nonce">—</div></div>
+        <div class="kv"><div class="k">Signature</div><div class="v" id="sig">—</div></div>
+        <div class="kv"><div class="k">Attestation</div><div class="v" style="color:var(--good)">Valid ✓</div></div>
+        <div class="kv"><div class="k">Method</div><div class="v" id="method">NFC</div></div>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="back2">Back</button>
+        <button id="next2" disabled>Next</button>
+      </div>
+    </div>
+
+    <!-- 3 CONSENT WALLET (Selective Disclosure) -->
+    <div class="card screen" data-step="3" data-title="Consent Wallet (Selective Disclosure)">
+      <h2>3) Consent Wallet</h2>
+      <p>Share only what’s needed using selective disclosure. No raw documents are stored. Toggle what you consent to disclose.</p>
+      <div class="row">
+        <label class="toggle"><input type="checkbox" id="ageT" checked><span>Proof: Over 18</span></label>
+        <label class="toggle"><input type="checkbox" id="licT" checked><span>Proof: Valid Driving License</span></label>
+        <label class="toggle"><input type="checkbox" id="addrT"><span>Proof: Address in city limit</span></label>
+        <label class="toggle"><input type="checkbox" id="ncbT" checked><span>NCB % from prior insurer</span></label>
+      </div>
+      <div class="tip">We generate zero‑knowledge proofs (ZK) so relying parties can verify without seeing your raw data.</div>
+      <div class="keyvals" id="zkOut" style="margin-top:10px"></div>
+      <div class="actions">
+        <button class="secondary" id="back3">Back</button>
+        <button id="next3" disabled>Generate ZK Proofs</button>
+      </div>
+    </div>
+
+    <!-- 4 AR GUIDED CAPTURE -->
+    <div class="card screen" data-step="4" data-title="AR‑Guided Capture (3D)">
+      <h2>4) AR‑Guided Capture</h2>
+      <p>Capture <b>8 guided angles</b>. We’ll build a 3D condition fingerprint and seal the images with C2PA provenance.</p>
+      <div class="ar-stage">
+        <div class="car-sil">
+          <svg width="240" height="120" viewBox="0 0 240 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="60" width="200" height="30" rx="8" fill="#94a3b8"/>
+            <rect x="60" y="40" width="120" height="20" rx="8" fill="#94a3b8"/>
+            <circle cx="70" cy="95" r="10" fill="#94a3b8"/>
+            <circle cx="190" cy="95" r="10" fill="#94a3b8"/>
+          </svg>
+        </div>
+        <div class="guide">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path d="M5,80 Q50,20 95,80" stroke="url(#g2)" stroke-width="2" fill="none" stroke-dasharray="4 4"/>
+            <defs><linearGradient id="g2" x1="0" x2="1"><stop offset="0%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient></defs>
+          </svg>
+        </div>
+      </div>
+      <div class="row" id="captRow"></div>
+      <div class="tip">Angles completed: <b id="angCount">0</b>/8 • <span id="angleStatus" class="angle-bad">Need more angles</span></div>
+      <div class="actions">
+        <button class="secondary" id="back4">Back</button>
+        <label class="secondary" style="padding:11px 14px; border-radius:12px; cursor:pointer">Upload Angle <input type="file" id="angleUp" accept="image/*" style="display:none"></label>
+        <button id="next4" disabled>Build 3D + Seal</button>
+      </div>
+    </div>
+
+    <!-- 5 INSTANT PREMIUM / COVERAGE COMPOSER -->
+    <div class="card screen" data-step="5" data-title="Instant Premium & Coverage Composer">
+      <h2>5) Instant Premium</h2>
+      <p>Tune your coverage. We’ll keep you inside your budget while maximizing adequacy. Transparent factors and credits shown on the right.</p>
+      <div class="breakdown">
+        <div>
+          <div class="kv"><div class="k">Budget (₹/year)</div><div class="v"><input type="range" id="budget" min="5000" max="30000" step="500" value="14000" style="width:100%"><div id="bVal">₹14,000</div></div></div>
+          <div class="row" style="margin-top:8px">
+            <label class="toggle"><input type="checkbox" id="zeroDep" checked><span>Zero Depreciation</span></label>
+            <label class="toggle"><input type="checkbox" id="engineP" checked><span>Engine Protect</span></label>
+            <label class="toggle"><input type="checkbox" id="rsa"><span>Roadside Assist</span></label>
+            <label class="toggle"><input type="checkbox" id="consum"><span>Consumables</span></label>
+          </div>
+          <div class="line"><span>Base premium</span><span id="baseAmt">₹10,450</span></div>
+          <div class="line"><span>Credits (garage, NCB)</span><span id="credAmt" style="color:var(--good)">−₹850</span></div>
+          <div class="line"><span>Add‑ons</span><span id="addonAmt">₹1,900</span></div>
+          <div class="line"><span>Taxes</span><span id="taxAmt">₹1,623</span></div>
+          <div class="line total"><span>Total</span><span id="totalAmt">₹13,123</span></div>
+        </div>
+        <div>
+          <div class="chart"><canvas id="donut" width="260" height="160"></canvas></div>
+          <div class="kv" style="margin-top:10px">
+            <div class="k">Why this price?</div>
+            <div class="v" style="font-weight:600">Verified garage ✓ • Flood risk low ✓ • Prior NCB 25% ✓ • Vehicle condition: Good ✓</div>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="back5">Back</button>
+        <button id="next5">Continue to eSign</button>
+      </div>
+    </div>
+
+    <!-- 6 ESIGN (Passkey + Signature) -->
+    <div class="card screen" data-step="6" data-title="Passkey / eSign">
+      <h2>6) Digital Signature</h2>
+      <p>Use a device passkey (Face/Touch ID) for instant, secure signing. Or draw your signature below.</p>
+      <div class="row">
+        <button id="passkeyBtn">Use Passkey</button>
+        <button class="secondary" id="passkeyAlt">Use OTP (fallback)</button>
+      </div>
+      <div style="height:8px"></div>
+      <canvas id="pad" class="esign-pad"></canvas>
+      <div class="check"><input type="checkbox" id="agree"> <label for="agree">I agree to the Terms & Conditions and consent to digital issuance.</label></div>
+      <div class="actions">
+        <button class="secondary" id="back6">Back</button>
+        <button id="next6" disabled>Sign & Bind</button>
+      </div>
+    </div>
+
+    <!-- 7 POLICY CARD -->
+    <div class="card screen" data-step="7" data-title="Policy Card Issued">
+      <h2>7) Policy Card Issued</h2>
+      <p>Your policy is now live. We’ve also sealed your inception evidence pack (C2PA) and anchored its hash for tamper‑evident audit.</p>
+      <div class="card-pol">
+        <div>
+          <h3>Policy • MP-2025-001274</h3>
+          <div class="row">
+            <span class="pill">Baleno • 2022</span>
+            <span class="pill">IDV: ₹6.4L</span>
+            <span class="pill">Zero Dep</span>
+            <span class="pill">Engine Protect</span>
+          </div>
+          <div style="height:6px"></div>
+          <button class="secondary" id="walletBtn">Add to Wallet</button>
+          <button id="downloadPack">Download Evidence Pack</button>
+        </div>
+        <div class="qr" id="qr"></div>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="restart">Start Over</button>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<!-- Helper bubble -->
+<div class="helper" id="helper">
+  <div class="bubble" id="hb">Need help? Ask the Issuance Copilot.<br/><small>e.g., “What is Zero‑Dep?”</small></div>
+  <div class="fab" id="fab">?</div>
+</div>
+
+<div class="footer">Prototype v2 • For demo only • No real data is transmitted.</div>
+
+<script>
+  // THEME TOGGLE (light/dark accent)
+  const modeBtn = document.getElementById('modeBtn');
+  let dark = true;
+  modeBtn.addEventListener('click', ()=>{
+    dark = !dark;
+    document.documentElement.style.setProperty('--bg', dark ? '#0f172a' : '#f8fafc');
+    document.documentElement.style.setProperty('--text', dark ? '#e5e7eb' : '#0f172a');
+    document.body.style.color = getComputedStyle(document.documentElement).getPropertyValue('--text');
+  });
+
+  // Build sidebar steps dynamically from screens
+  const screens = [...document.querySelectorAll('.screen')];
+  const side = document.getElementById('steps');
+  const bar = document.getElementById('bar');
+  const pct = document.getElementById('pct');
+  let current = 0; // index in screens
+
+  function renderStepper(){
+    side.innerHTML = '';
+    screens.forEach((s, i)=>{
+      const el = document.createElement('div');
+      el.className = 'step' + (i===current? ' active':'');
+      el.addEventListener('click', ()=>go(i));
+      el.innerHTML = `<div class="idx">${i+1}</div><div><div class="title">${s.dataset.title}</div><div class="tiny">Step ${i+1} of ${screens.length}</div></div>`;
+      side.appendChild(el);
+    });
+    const complete = Math.round((current)/(screens.length-1)*100);
+    bar.style.width = complete + '%';
+    pct.textContent = complete + '% complete';
+  }
+
+  function go(i){ screens[current].classList.remove('active'); current = i; screens[current].classList.add('active'); renderStepper(); }
+  renderStepper();
+
+  // Step 1: Vehicle Scan (simulate OCR)
+  const simulateOCR = document.getElementById('simulateOCR');
+  const vehData = document.getElementById('vehData');
+  const next1 = document.getElementById('next1');
+  simulateOCR.addEventListener('click', ()=>{
+    document.getElementById('plateVal').textContent = 'MH01AB' + Math.floor(1000+Math.random()*8999);
+    document.getElementById('vinVal').textContent = 'MA3EJKD29L' + Math.floor(1000000+Math.random()*8999999);
+    vehData.style.display = 'grid';
+    next1.disabled = false;
+  });
+  document.getElementById('prev1').addEventListener('click', ()=>{});
+  next1.addEventListener('click', ()=> go(1));
+
+  // Step 2: NFC/QR attestation
+  function randHex(len){return [...Array(len)].map(()=>Math.floor(Math.random()*16).toString(16)).join('');}
+  const tapNFC = document.getElementById('tapNFC');
+  const scanQR = document.getElementById('scanQR');
+  const attestBlock = document.getElementById('attestBlock');
+  const next2 = document.getElementById('next2');
+  const back2 = document.getElementById('back2');
+  tapNFC.addEventListener('click', ()=>{ attest('NFC'); });
+  scanQR.addEventListener('click', ()=>{ attest('QR'); });
+  function attest(method){
+    document.getElementById('nonce').textContent = randHex(10);
+    document.getElementById('sig').textContent = randHex(32);
+    document.getElementById('method').textContent = method;
+    attestBlock.style.display = 'grid';
+    next2.disabled = false;
+  }
+  back2.addEventListener('click', ()=> go(0));
+  next2.addEventListener('click', ()=> go(2));
+
+  // Step 3: Consent Wallet (ZK proofs)
+  const next3 = document.getElementById('next3');
+  ['ageT','licT','addrT','ncbT'].forEach(id=> document.getElementById(id).addEventListener('change', checkZK));
+  function checkZK(){
+    const any = ['ageT','licT','addrT','ncbT'].some(id=> document.getElementById(id).checked);
+    next3.disabled = !any;
+  }
+  checkZK();
+  next3.addEventListener('click', ()=>{
+    const out = document.getElementById('zkOut');
+    const payload = {
+      proofs: {
+        over18: document.getElementById('ageT').checked,
+        licenseValid: document.getElementById('licT').checked,
+        addressInCity: document.getElementById('addrT').checked,
+        ncbPercent: document.getElementById('ncbT').checked ? 25 : null
+      },
+      issuedAt: new Date().toISOString()
+    };
+    out.innerHTML = `<div class="kv" style="grid-column:1/-1"><div class="k">ZK Proof Bundle</div><div class="v"><pre style="white-space:pre-wrap; margin:0">${JSON.stringify(payload, null, 2)}</pre></div></div>`;
+    setTimeout(()=> go(3), 400);
+  });
+  document.getElementById('back3').addEventListener('click', ()=> go(1));
+
+  // Step 4: AR‑Guided Capture
+  const angleUp = document.getElementById('angleUp');
+  const captRow = document.getElementById('captRow');
+  const angCount = document.getElementById('angCount');
+  const angleStatus = document.getElementById('angleStatus');
+  const next4 = document.getElementById('next4');
+  let angles = [];
+  angleUp.addEventListener('change', (e)=>{
+    const file = e.target.files[0]; if(!file) return;
+    const url = URL.createObjectURL(file);
+    const idx = angles.length+1;
+    angles.push(url);
+    const chip = document.createElement('div');
+    chip.className='pill';
+    chip.innerHTML = `Angle ${idx} ✓`;
+    captRow.appendChild(chip);
+    angCount.textContent = angles.length;
+    if(angles.length>=8){ angleStatus.textContent = 'All angles complete'; angleStatus.className='angle-ok'; next4.disabled=false; }
+  });
+  document.getElementById('back4').addEventListener('click', ()=> go(2));
+  next4.addEventListener('click', ()=>{
+    next4.disabled = true; next4.textContent = 'Processing 3D…';
+    setTimeout(()=>{ next4.textContent='Build 3D + Seal'; go(4); }, 900);
+  });
+
+  // Step 5: Premium composer + donut chart
+  const budget = document.getElementById('budget');
+  const bVal = document.getElementById('bVal');
+  const baseAmt = document.getElementById('baseAmt');
+  const credAmt = document.getElementById('credAmt');
+  const addonAmt = document.getElementById('addonAmt');
+  const taxAmt = document.getElementById('taxAmt');
+  const totalAmt = document.getElementById('totalAmt');
+  const toggles = ['zeroDep','engineP','rsa','consum'].map(id=> document.getElementById(id));
+  const donut = document.getElementById('donut').getContext('2d');
+
+  function fmt(n){ return '₹' + n.toLocaleString('en-IN'); }
+  function recompute(){
+    const bud = Number(budget.value);
+    bVal.textContent = fmt(bud);
+    let base = 10450; let cred = -850; let addons = 0;
+    if(toggles[0].checked) addons += 1200;
+    if(toggles[1].checked) addons += 700;
+    if(toggles[2].checked) addons += 250;
+    if(toggles[3].checked) addons += 300;
+    let subtotal = base + cred + addons;
+    let tax = Math.round(subtotal * 0.18);
+    let total = subtotal + tax;
+    // Nudge towards budget by adjusting base slightly (demo only)
+    if(total > bud) { base -= Math.min(800, total - bud); }
+    if(total < bud) { addons += Math.min(600, bud - total); }
+    subtotal = base + cred + addons; tax = Math.round(subtotal * 0.18); total = subtotal + tax;
+    baseAmt.textContent = fmt(base);
+    credAmt.textContent = (cred<0? '−':'') + fmt(Math.abs(cred));
+    addonAmt.textContent = fmt(addons);
+    taxAmt.textContent = fmt(tax);
+    totalAmt.textContent = fmt(total);
+    drawDonut(base, -cred, addons, tax);
+  }
+  function drawDonut(base, credits, addons, tax){
+    const total = base + credits + addons + tax;
+    const parts = [base, credits, addons, tax];
+    const cols = ['#22d3ee','#10b981','#a78bfa','#f59e0b'];
+    donut.clearRect(0,0,260,160);
+    const cx=130, cy=80, r=60, t=18; let a= -Math.PI/2;
+    parts.forEach((v,i)=>{
+      const ang = (v/total)*Math.PI*2;
+      donut.beginPath(); donut.arc(cx, cy, r, a, a+ang); donut.lineWidth=t; donut.strokeStyle=cols[i]; donut.stroke(); a+=ang; });
+    // center label
+    donut.fillStyle = '#e5e7eb'; donut.font='700 16px system-ui';
+    donut.textAlign='center'; donut.fillText('Breakdown', cx, cy+6);
+  }
+  budget.addEventListener('input', recompute);
+  toggles.forEach(t=> t.addEventListener('change', recompute));
+  recompute();
+  document.getElementById('back5').addEventListener('click', ()=> go(3));
+  document.getElementById('next5').addEventListener('click', ()=> go(5));
+
+  // Step 6: eSign (passkey + canvas signature)
+  const pad = document.getElementById('pad');
+  const ctx = pad.getContext('2d');
+  let drawing=false, lx=0, ly=0;
+  function resizePad(){ pad.width = pad.clientWidth; pad.height = pad.clientHeight; ctx.lineWidth=2; ctx.strokeStyle='#e5e7eb'; ctx.lineCap='round'; }
+  window.addEventListener('resize', resizePad); resizePad();
+  pad.addEventListener('pointerdown', e=>{ drawing=true; lx=e.offsetX; ly=e.offsetY; });
+  pad.addEventListener('pointermove', e=>{ if(!drawing) return; ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(e.offsetX,e.offsetY); ctx.stroke(); lx=e.offsetX; ly=e.offsetY; });
+  pad.addEventListener('pointerup', ()=> drawing=false);
+  document.getElementById('passkeyBtn').addEventListener('click', ()=>{
+    // Simulate WebAuthn success
+    confetti();
+    document.getElementById('next6').disabled = false;
+  });
+  document.getElementById('passkeyAlt').addEventListener('click', ()=>{
+    alert('OTP sent: 123456 (demo)');
+    document.getElementById('next6').disabled = false;
+  });
+  document.getElementById('agree').addEventListener('change', (e)=>{
+    document.getElementById('next6').disabled = !e.target.checked;
+  });
+  document.getElementById('back6').addEventListener('click', ()=> go(4));
+  document.getElementById('next6').addEventListener('click', ()=>{ confetti(); go(6); });
+
+  // Step 7: Policy card
+  document.getElementById('downloadPack').addEventListener('click', ()=>{
+    const blob = new Blob([JSON.stringify({policy:'MP-2025-001274', evidenceHash:'sha256:'+randHex(64)},null,2)], {type:'application/json'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'evidence_pack.json'; a.click();
+  });
+  document.getElementById('walletBtn').addEventListener('click', ()=> alert('Added to Wallet (demo)'));
+  document.getElementById('restart').addEventListener('click', ()=>{ location.reload(); });
+
+  // Helper bubble interactions
+  const fab = document.getElementById('fab');
+  const hb = document.getElementById('hb');
+  fab.addEventListener('click', ()=>{
+    hb.textContent = ['Zero‑Dep covers 100% of parts without depreciation.','Engine Protect covers hydrostatic lock during floods.','Your data stays on device unless you consent.'][Math.floor(Math.random()*3)];
+  });
+
+  // Confetti animation (simple)
+  function confetti(){
+    const c = document.createElement('canvas'); c.width = innerWidth; c.height = innerHeight; c.style.position='fixed'; c.style.inset=0; c.style.pointerEvents='none'; c.style.zIndex=9999; document.body.appendChild(c);
+    const cx = c.getContext('2d'); const pieces = Array.from({length:160},()=>({x:Math.random()*c.width, y:-20, s: 4+Math.random()*6, c:`hsl(${Math.random()*360},80%,60%)`, v: 2+Math.random()*3}));
+    let t=0; (function anim(){ cx.clearRect(0,0,c.width,c.height); pieces.forEach(p=>{ p.y += p.v; p.x += Math.sin((p.y+p.s)*.02)*1.5; cx.fillStyle=p.c; cx.fillRect(p.x, p.y, p.s, p.s); }); t++; if(t<220) requestAnimationFrame(anim); else c.remove(); })();
+  }
+</script>
+</body>
+</html>
